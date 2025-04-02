@@ -333,6 +333,7 @@ def main():
         token = os.getenv('TELEGRAM_BOT_TOKEN')
         if not token:
             logger.error("Error: TELEGRAM_BOT_TOKEN not found in environment variables")
+            logger.info("Please set TELEGRAM_BOT_TOKEN in Railway environment variables")
             return
 
         logger.info("Bot token loaded successfully")
