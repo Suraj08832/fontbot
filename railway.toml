@@ -11,4 +11,4 @@ restartPolicyMaxRetries = 3
 
 [deploy.env]
 PYTHON_VERSION = "3.11.1"
-TELEGRAM_BOT_TOKEN = "7783714198:AAHOo4vMrvr4PjwMn0ioqsfr77Z3kT6Ua5g-2bkc" 
+TELEGRAM_BOT_TOKEN = 7783714198:AAHOo4vMrvr4PjwMn0ioqsfr77Z3kT6Ua5g 
