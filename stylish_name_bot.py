@@ -27,6 +27,19 @@ load_dotenv()
 LOCKFILE = "/tmp/stylish_name_bot.lock"
 BOT_INSTANCE_ID = f"{os.getpid()}-{int(time.time())}"
 
+# Health check server
+async def health_check(request):
+    return web.Response(text="OK")
+
+async def start_health_check_server():
+    app = web.Application()
+    app.router.add_get('/', health_check)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', int(os.getenv('PORT', '8000')))
+    await site.start()
+    logger.info("Health check server started")
+
 def create_lock():
     """Create a lock file to prevent multiple instances."""
     try:
@@ -159,7 +172,7 @@ STYLISH_FONTS = [
     "ᴛʀᴀᴅɪᴛɪᴏɴᴀʟ sᴍᴀʟʟᴄᴀᴘs: ɴᴀᴍᴇ",
     "ₜᵣₐdᵢₜᵢₒₙₐₗ ₛᵤbₛcᵣᵢₚₜ: ₙₐₘₑ",
     "ᵗʳᵃᵈⁱᵗⁱᵒⁿᵃˡ ˢᵘᵖᵉʳˢᶜʳⁱᵖᵗ: ⁿᵃᵐᵉ",
-    "𝓣𝓻𝓪𝓭𝓲𝓽𝓲𝓸𝓷𝓪𝓵 𝓢𝓬𝓻𝓲𝓹𝓽: 𝓝𝓐𝓜𝓔",
+    "𝓣𝓻𝓪𝓭𝓲𝓽𝓲𝓸��𝓪𝓵 𝓢𝓬𝓻𝓲𝓹𝓽: 𝓝𝓐𝓜𝓔",
     "𝕋𝕣𝕒𝕕𝕚𝕥𝕚𝕠𝕟𝕒𝕝 𝔻𝕠𝕦𝕓𝕝𝕖: ℕ𝔸𝕄𝔼",
     "Ⓣⓡⓐⓓⓘⓣⓘⓞⓝⓐⓛ Ⓒⓘⓡⓒⓛⓔⓓ: ⓃⒶⓂⒺ",
     "🅣🅡🅐🅓🅘🅣🅘🅞🅝🅐🅛 🅢🅠🅤🅐🅡🅔🅓: 🅝🅐🅜🅔",
@@ -358,6 +371,10 @@ def main():
         application.add_handler(CallbackQueryHandler(button_callback))
         application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
         logger.info("Handlers added successfully")
+        
+        # Start health check server
+        loop = asyncio.get_event_loop()
+        loop.create_task(start_health_check_server())
         
         # Run the bot with optimized settings
         logger.info("Starting bot polling...")
