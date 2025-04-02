@@ -1,1 +1,1 @@
-worker: python stylish_name_bot.py 
+web: python stylish_name_bot.py 
