@@ -329,18 +329,12 @@ async def button_callback(update: Update, context: CallbackContext) -> None:
 def main():
     """Main entry point for the application."""
     try:
-        # Check if another instance is running
-        if not create_lock():
-            logger.error("Another bot instance is already running. Exiting.")
-            return
-
         # Create the Application and pass it your bot's token
         token = os.getenv('TELEGRAM_BOT_TOKEN')
         if not token:
             logger.error("Error: TELEGRAM_BOT_TOKEN not found in environment variables")
             return
 
-        logger.info(f"Bot instance started with ID: {BOT_INSTANCE_ID}")
         logger.info("Bot token loaded successfully")
         logger.info("Initializing bot...")
         
@@ -349,19 +343,13 @@ def main():
             Application.builder()
             .token(token)
             .concurrent_updates(False)  # Process updates sequentially
+            .get_updates_read_timeout(7)  # Shorter read timeout
+            .get_updates_write_timeout(5)  # Shorter write timeout
+            .get_updates_connect_timeout(5)  # Shorter connect timeout
+            .get_updates_pool_timeout(30)  # Shorter pool timeout
             .build()
         )
         logger.info("Application built successfully")
-
-        # Define shutdown handler
-        def shutdown_handler(signum, frame):
-            logger.info(f"Received signal {signum}. Shutting down gracefully.")
-            remove_lock()
-            sys.exit(0)
-            
-        # Register signal handlers for graceful shutdown
-        signal.signal(signal.SIGINT, shutdown_handler)
-        signal.signal(signal.SIGTERM, shutdown_handler)
 
         # Add handlers
         application.add_handler(CommandHandler("start", start))
@@ -370,46 +358,12 @@ def main():
         application.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE, handle_edited_message))
         logger.info("Handlers added successfully")
         
-        # Start the web server in a separate thread
-        port = int(os.getenv('PORT', 8080))
-        logger.info(f"Starting web server on port {port}...")
-        
-        # Setup web app
-        app = web.Application()
-        routes = web.RouteTableDef()
-        
-        @routes.get('/')
-        async def hello(request):
-            return web.Response(text=f"Bot is running! Instance ID: {BOT_INSTANCE_ID}")
-        
-        app.add_routes(routes)
-        
-        # Run web server in a separate thread
-        import threading
-        def run_web_server():
-            web_loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(web_loop)
-            runner = web.AppRunner(app)
-            web_loop.run_until_complete(runner.setup())
-            site = web.TCPSite(runner, '0.0.0.0', port)
-            web_loop.run_until_complete(site.start())
-            logger.info(f"Web server started successfully on port {port}")
-            web_loop.run_forever()
-            
-        webserver_thread = threading.Thread(target=run_web_server)
-        webserver_thread.daemon = True
-        webserver_thread.start()
-        
-        # Run the bot with specific ID to prevent conflicts
+        # Run the bot with optimized settings
         logger.info("Starting bot polling...")
         application.run_polling(
             drop_pending_updates=True,
             allowed_updates=Update.ALL_TYPES,
-            pool_timeout=30,  # Shorter pool timeout
-            read_timeout=7,   # Shorter read timeout
-            write_timeout=5,  # Shorter write timeout
-            connect_timeout=5, # Shorter connect timeout
-            poll_interval=1.0 # Shorter poll interval
+            poll_interval=1.0  # Shorter poll interval
         )
         logger.info("Bot polling stopped")
     
@@ -419,7 +373,6 @@ def main():
         logger.error(f"Unhandled exception: {e}", exc_info=True)
     finally:
         logger.info("Application stopped")
-        remove_lock()  # Ensure lock is removed
 
 if __name__ == '__main__':
     main() 
