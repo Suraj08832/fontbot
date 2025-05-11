@@ -3,6 +3,7 @@ import os
 import requests
 import random
 import itertools
+import asyncio
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, filters
 from config import BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE, CHOOSING_STYLE, CUSTOMIZING_STYLE
@@ -836,8 +837,16 @@ async def main():
     application.add_handler(CallbackQueryHandler(handle_callback))
 
     # Start the Bot
+    await application.initialize()
+    await application.start()
     await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    import asyncio
-    asyncio.run(main()) 
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped by user")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        print("Bot stopped") 
