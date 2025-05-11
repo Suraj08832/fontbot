@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Bot token - Using the provided token directly
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or os.getenv("BOT_TOKEN", "7877213016:AAGt4O2V1NLaeaK5r1VVPSdMomywo-KCt-4")
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or os.getenv("BOT_TOKEN", "7933340857:AAH3joU4ZTv6b6X01DStD4-SzYSc7jVT490")
 
 # Conversation states
 CHOOSING_STYLE, CUSTOMIZING_STYLE = range(2)
