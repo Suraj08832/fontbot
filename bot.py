@@ -6,8 +6,8 @@ import itertools
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto, InputFile
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, filters
 from config import BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE, CHOOSING_STYLE, CUSTOMIZING_STYLE
-from utils import transform_text, create_custom_style, get_all_styles, get_stylish_char_by_index
-from styles import STYLISH_CHARS, NAME_STYLES
+from utils import transform_text, create_custom_style, get_all_styles, get_stylish_char_by_index, get_styled_text, get_character_style, get_style_combinations
+from styles import STYLISH_CHARS, NAME_STYLES, name_styles, character_styles
 
 # Enable logging
 logging.basicConfig(
@@ -680,52 +680,23 @@ async def show_style_combinations(message, input_text, page=0, query=None):
     
     return ConversationHandler.END
 
-def main():
+async def main():
     """Start the bot."""
-    try:
-        # Keep the bot alive on Replit
-        try:
-            from keep_alive import keep_alive
-            keep_alive()
-            logger.info("Keep-alive web server started")
-        except ImportError:
-            logger.info("Keep-alive module not found, skipping web server")
-        
-        # Create the Application
-        application = Application.builder().token(BOT_TOKEN).build()
+    # Create the Application
+    application = Application.builder().token(BOT_TOKEN).build()
 
-        # Add conversation handler with entry points for various commands and callbacks
-        conv_handler = ConversationHandler(
-            entry_points=[
-                CommandHandler('start', start),
-                CommandHandler('style', style_command), 
-                CommandHandler('custom', custom_command),
-                CommandHandler('chars', char_command),
-                CallbackQueryHandler(button_callback, pattern="^(generate_name|generate_combos)$")
-            ],
-            states={
-                CHOOSING_STYLE: [CallbackQueryHandler(button_callback)],
-                CUSTOMIZING_STYLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
-                SELECTING_CHAR: [CallbackQueryHandler(button_callback)]
-            },
-            fallbacks=[CommandHandler('start', start), CommandHandler('help', help_command)]
-        )
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("styles", show_all_styled_names))
+    application.add_handler(CommandHandler("characters", show_all_character_styles))
+    application.add_handler(CommandHandler("combine", show_style_combinations))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    application.add_handler(CallbackQueryHandler(handle_callback))
 
-        # Add handlers
-        application.add_handler(CommandHandler("start", start))
-        application.add_handler(CommandHandler("help", help_command))
-        application.add_handler(conv_handler)
-        
-        # Global callback handler for all button patterns that might not be handled by the conversation
-        application.add_handler(CallbackQueryHandler(button_callback))
-
-        # Start the Bot
-        logger.info("Starting bot polling...")
-        application.run_polling(allowed_updates=Update.ALL_TYPES)
-    except Exception as e:
-        logger.error(f"Error in main function: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+    # Start the Bot
+    await application.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == '__main__':
-    main() 
+    import asyncio
+    asyncio.run(main()) 
