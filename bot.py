@@ -680,6 +680,147 @@ async def show_style_combinations(message, input_text, page=0, query=None):
     
     return ConversationHandler.END
 
+async def show_all_character_styles(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show all character styles in a grid format."""
+    # Create keyboard for buttons
+    keyboard = []
+    
+    # Get all letters
+    letters = list('abcdefghijklmnopqrstuvwxyz')
+    
+    # Create a 5x5 grid of buttons
+    chunk_size = 5  # 5 characters per row
+    for i in range(0, len(letters), chunk_size):
+        row = []
+        for j in range(chunk_size):
+            if i + j < len(letters):
+                letter = letters[i + j]
+                # Show the fancy version of each character in the button text
+                fancy_letter = get_stylish_char_by_index(letter, 0)  # Get first style for display
+                row.append(InlineKeyboardButton(f"{fancy_letter}", callback_data=f"show_char_{letter}"))
+        keyboard.append(row)
+    
+    # Add navigation buttons
+    keyboard.append([
+        InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_start")
+    ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    message_text = "🔤 Choose a character to see all its stylish versions:"
+    
+    if update.message:
+        await update.message.reply_text(text=message_text, reply_markup=reply_markup)
+    else:
+        await update.callback_query.edit_message_text(text=message_text, reply_markup=reply_markup)
+
+async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle button callbacks."""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "generate_name":
+        # Prompt user to enter a name to style
+        context.user_data['mode'] = 'generate_name'
+        await query.edit_message_text("✏️ Enter your name or text to see all stylish versions:")
+        return CUSTOMIZING_STYLE
+    
+    elif query.data == "generate_combos":
+        # Prompt user to enter a name for combination styling
+        context.user_data['mode'] = 'generate_combos'
+        await query.edit_message_text("✏️ Enter your name or text to see different style combinations:")
+        return CUSTOMIZING_STYLE
+    
+    elif query.data.startswith("show_char_"):
+        # Show all styles for a specific character
+        char = query.data.replace("show_char_", "")
+        await show_char_styles(update, context, char, query)
+        return
+    
+    elif query.data.startswith("copy_char_"):
+        # Copy a specific character style
+        styled_char = query.data.replace("copy_char_", "")
+        # Send the styled character as a separate message for easy copying
+        copy_keyboard = [[InlineKeyboardButton("🔙 Back", callback_data=f"show_char_{styled_char.lower()}")]]
+        reply_markup = InlineKeyboardMarkup(copy_keyboard)
+        
+        await query.message.reply_text(
+            f"<b>Here's your styled character:</b>\n\n<code>{styled_char}</code>\n\n<i>👆 Tap and hold on the text above to copy it</i>",
+            parse_mode='HTML',
+            reply_markup=reply_markup
+        )
+        return
+    
+    elif query.data == "back_to_start":
+        # Back to start screen
+        keyboard = [
+            [
+                InlineKeyboardButton("✨ Generate Stylish Name ✨", callback_data="generate_name")
+            ],
+            [
+                InlineKeyboardButton("🎲 Generate Style Combinations", callback_data="generate_combos")
+            ],
+            [
+                InlineKeyboardButton("👤 Our Channel", url="https://t.me/chamber_of_heart1")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        try:
+            await query.edit_message_text(
+                text=f"{WELCOME_MESSAGE}",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            logger.error(f"Failed to edit message: {e}")
+            await query.message.reply_text(
+                f"{WELCOME_MESSAGE}",
+                reply_markup=reply_markup
+            )
+        return
+
+async def show_char_styles(update: Update, context: ContextTypes.DEFAULT_TYPE, char=None, query=None):
+    """Show all styles for a specific character."""
+    if not char and query and query.data.startswith("show_char_"):
+        char = query.data.split("_")[2]
+    
+    if not char:
+        return
+    
+    # Get all stylish variations of the character
+    variants = STYLISH_CHARS.get(char, [char])
+    
+    # Create a keyboard with all styles in 5x5 grid format
+    keyboard = []
+    
+    # Show all variants in rows of 5
+    chunk_size = 5  # 5 variants per row
+    for i in range(0, len(variants), chunk_size):
+        row = []
+        for j in range(chunk_size):
+            if i + j < len(variants):
+                variant = variants[i + j]
+                row.append(InlineKeyboardButton(variant, callback_data=f"copy_char_{variant}"))
+        keyboard.append(row)
+    
+    # Add navigation buttons
+    keyboard.append([
+        InlineKeyboardButton("🔙 Back to Characters", callback_data="show_all_chars")
+    ])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    message_text = f"✨ All {len(variants)} stylish versions of '{char}':"
+    
+    if query:
+        try:
+            await query.edit_message_text(text=message_text, reply_markup=reply_markup)
+        except Exception as e:
+            logger.error(f"Error editing message: {e}")
+            await query.message.reply_text(text=message_text, reply_markup=reply_markup)
+    else:
+        await update.message.reply_text(text=message_text, reply_markup=reply_markup)
+
 async def main():
     """Start the bot."""
     # Create the Application
