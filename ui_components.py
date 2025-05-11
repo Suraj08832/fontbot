@@ -1,10 +1,11 @@
 import logging
 import time
+import random
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ConversationHandler
 from telegram.error import BadRequest, TimedOut, NetworkError, TelegramError
 
-from utils import transform_text, get_all_styles, get_stylish_char_by_index, generate_style_permutations
+from utils import transform_text, get_all_styles, get_stylish_char_by_index, generate_style_permutations, format_styled_name, generate_name_combinations
 from styles import STYLISH_CHARS
 
 # Set up logging
@@ -238,150 +239,208 @@ async def show_name_styles_grid(message, input_text, query=None):
 
 async def show_all_styled_names(message, input_text, name_page=0, char_page=0, query=None):
     """Show name styles for the input text with pagination."""
-    # Create keyboard for buttons
-    keyboard = []
-    
-    # Calculate pages
-    name_styles = get_all_styles()
-    styles_per_page = 10  # Show 10 name styles per page (2 rows of 5)
-    total_name_pages = (len(name_styles) + styles_per_page - 1) // styles_per_page
-    
-    # Get current page of name styles
-    start_idx = name_page * styles_per_page
-    end_idx = min(start_idx + styles_per_page, len(name_styles))
-    current_page_styles = name_styles[start_idx:end_idx]
-    
-    # Add title for name styles section
-    keyboard.append([
-        InlineKeyboardButton(f"✨ Name Styles (Page {name_page+1}/{total_name_pages}) ✨", callback_data="do_nothing")
-    ])
-    
-    # Add name styles (current page)
-    for i in range(0, len(current_page_styles), 5):
-        row = []
-        for j in range(5):
-            if i + j < len(current_page_styles):
-                style_idx = start_idx + i + j
-                # Apply the style to the input text
-                styled_text = transform_text(input_text, name_styles[style_idx])
-                # Truncate if too long
-                styled_preview = (styled_text[:6] + "...") if len(styled_text) > 9 else styled_text
-                row.append(InlineKeyboardButton(f"{styled_preview}", callback_data=f"copy_style_{style_idx}_{input_text}"))
-        if row:
-            keyboard.append(row)
-    
-    # Add name styles pagination
-    nav_row = []
-    if name_page > 0:
-        nav_row.append(InlineKeyboardButton("⬅️ Prev Styles", callback_data=f"style_page_{name_page-1}_{input_text}"))
-    if name_page < total_name_pages - 1:
-        nav_row.append(InlineKeyboardButton("Next Styles ➡️", callback_data=f"style_page_{name_page+1}_{input_text}"))
-    
-    if nav_row:
-        keyboard.append(nav_row)
-    
-    # Add navigation buttons
-    keyboard.append([
-        InlineKeyboardButton("🔄 Try New Name", callback_data="generate_name"),
-        InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_start")
-    ])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    message_text = f"✨ Tap any style to get copyable text - '{input_text}' (browse all with next/prev):"
-    
-    if query:
+    try:
+        logger.debug(f"Generating styled names for input: {input_text[:10]}... (page {name_page})")
+        
+        # Create keyboard for buttons
+        keyboard = []
+        
+        # Calculate pages
+        name_styles = get_all_styles()
+        styles_per_page = 10  # Show 10 name styles per page (2 rows of 5)
+        total_name_pages = (len(name_styles) + styles_per_page - 1) // styles_per_page
+        
+        # Get current page of name styles
+        start_idx = name_page * styles_per_page
+        end_idx = min(start_idx + styles_per_page, len(name_styles))
+        current_page_styles = name_styles[start_idx:end_idx]
+        
+        # Add title for name styles section
+        keyboard.append([
+            InlineKeyboardButton(f"✨ Name Styles (Page {name_page+1}/{total_name_pages}) ✨", callback_data="do_nothing")
+        ])
+        
+        # Add name styles (current page)
+        for i in range(0, len(current_page_styles), 5):
+            row = []
+            for j in range(5):
+                if i + j < len(current_page_styles):
+                    style_idx = start_idx + i + j
+                    try:
+                        # Apply the style to the input text - use format_styled_name for templates
+                        styled_text = format_styled_name(input_text, name_styles[style_idx])
+                        # Truncate if too long
+                        styled_preview = (styled_text[:9] + "...") if len(styled_text) > 12 else styled_text
+                        row.append(InlineKeyboardButton(f"{styled_preview}", callback_data=f"copy_style_{style_idx}_{input_text}"))
+                    except Exception as e:
+                        logger.error(f"Error styling text with style {style_idx}: {e}")
+                        # Use a placeholder for failed styles
+                        row.append(InlineKeyboardButton("❌", callback_data="do_nothing"))
+            if row:
+                keyboard.append(row)
+        
+        # Add name styles pagination
+        nav_row = []
+        if name_page > 0:
+            nav_row.append(InlineKeyboardButton("⬅️ Prev Styles", callback_data=f"style_page_{name_page-1}_{input_text}"))
+        if name_page < total_name_pages - 1:
+            nav_row.append(InlineKeyboardButton("Next Styles ➡️", callback_data=f"style_page_{name_page+1}_{input_text}"))
+        
+        if nav_row:
+            keyboard.append(nav_row)
+        
+        # Add navigation buttons
+        keyboard.append([
+            InlineKeyboardButton("🔄 Try New Name", callback_data="generate_name"),
+            InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_start")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message_text = f"✨ Tap any style to get copyable text - '{input_text}' (browse all with next/prev):"
+        
+        # Use the helper function for sending/editing messages with retry logic
+        await retry_telegram_api_call(
+            send_or_edit_message,
+            message, 
+            message_text, 
+            reply_markup, 
+            query
+        )
+        
+        return ConversationHandler.END
+    except Exception as e:
+        logger.error(f"Error in show_all_styled_names: {e}")
         try:
-            # Try to edit the message if it's a text message
-            await query.edit_message_text(text=message_text, reply_markup=reply_markup)
-        except Exception as e:
-            try:
-                # Try to edit the caption if it's a photo message
-                await query.edit_message_caption(caption=message_text, reply_markup=reply_markup)
-            except Exception as e:
-                logger.error(f"Error editing message: {e}")
-                # If all else fails, send a new message
-                await query.message.reply_text(text=message_text, reply_markup=reply_markup)
-    else:
-        await message.reply_text(text=message_text, reply_markup=reply_markup)
-    
-    return ConversationHandler.END
+            # Fallback to a simpler message if the styled names failed
+            simple_keyboard = [[InlineKeyboardButton("🔄 Try Again", callback_data="generate_name")]]
+            simple_markup = InlineKeyboardMarkup(simple_keyboard)
+            
+            if query:
+                await query.message.reply_text("⚠️ Sorry, I couldn't generate styled names. Please try again.", reply_markup=simple_markup)
+            else:
+                await message.reply_text("⚠️ Sorry, I couldn't generate styled names. Please try again.", reply_markup=simple_markup)
+        except Exception as msg_error:
+            logger.error(f"Failed to send error message: {msg_error}")
+        
+        return ConversationHandler.END
 
 async def show_style_combinations(message, input_text, page=0, query=None):
     """Show combinations of character styles for the input text."""
-    # Create keyboard for buttons
-    keyboard = []
-    
-    # Generate style combinations
-    all_combinations = generate_style_permutations(input_text)
-    
-    # Calculate pagination
-    combos_per_page = 10  # 10 combinations per page (2 rows of 5)
-    total_pages = (len(all_combinations) + combos_per_page - 1) // combos_per_page
-    
-    # Get current page of combinations
-    start_idx = page * combos_per_page
-    end_idx = min(start_idx + combos_per_page, len(all_combinations))
-    current_page_combos = all_combinations[start_idx:end_idx]
-    
-    # Add title
-    keyboard.append([
-        InlineKeyboardButton(f"🎲 Style Combinations (Page {page+1}/{total_pages}) 🎲", callback_data="do_nothing")
-    ])
-    
-    # Add style combinations (current page)
-    for i in range(0, len(current_page_combos), 5):  # Five combinations per row (5x5 grid)
-        row = []
-        for j in range(5):
-            if i + j < len(current_page_combos):
-                styled_text = current_page_combos[i + j]
-                # Truncate if too long
-                styled_preview = (styled_text[:6] + "...") if len(styled_text) > 9 else styled_text
-                row.append(InlineKeyboardButton(f"{styled_preview}", callback_data=f"copy_text_{styled_text}"))
-        if row:
-            keyboard.append(row)
-    
-    # Add pagination navigation
-    nav_row = []
-    if page > 0:
-        nav_row.append(InlineKeyboardButton("⬅️ Prev Combos", callback_data=f"combo_page_{page-1}_{input_text}"))
-    if page < total_pages - 1:
-        nav_row.append(InlineKeyboardButton("Next Combos ➡️", callback_data=f"combo_page_{page+1}_{input_text}"))
-    
-    if nav_row:
-        keyboard.append(nav_row)
-    
-    # Add regenerate option
-    keyboard.append([
-        InlineKeyboardButton("🔄 Generate New Combinations", callback_data=f"regenerate_combos_{input_text}")
-    ])
-    
-    # Add navigation buttons
-    keyboard.append([
-        InlineKeyboardButton("🔄 Try New Text", callback_data="generate_combos"),
-        InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_start")
-    ])
-    
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    message_text = f"✨ Tap any combination to copy - '{input_text}' (browse with next/prev):"
-    
-    if query:
+    try:
+        logger.debug(f"Generating style combinations for: {input_text[:10]}... (page {page})")
+        
+        # Create keyboard for buttons
+        keyboard = []
+        
+        # Generate style combinations
+        all_combinations = []
+        
         try:
-            # Try to edit the message if it's a text message
-            await query.edit_message_text(text=message_text, reply_markup=reply_markup)
+            # Use generate_name_combinations for better name styling
+            all_combinations = generate_name_combinations(input_text, max_combos=30)
+            
+            # Remove duplicates
+            all_combinations = list(dict.fromkeys(all_combinations))
+            
+            # If not enough combinations, add some basic character styles
+            if len(all_combinations) < 5:
+                # Add character styles from STYLISH_CHARS
+                char_combos = generate_style_permutations(input_text, max_combos=15)
+                all_combinations.extend(char_combos)
+                all_combinations = list(dict.fromkeys(all_combinations))
         except Exception as e:
-            try:
-                # Try to edit the caption if it's a photo message
-                await query.edit_message_caption(caption=message_text, reply_markup=reply_markup)
-            except Exception as e:
-                logger.error(f"Error editing message: {e}")
-                # If all else fails, send a new message
-                await query.message.reply_text(text=message_text, reply_markup=reply_markup)
-    else:
-        await message.reply_text(text=message_text, reply_markup=reply_markup)
-    
-    return ConversationHandler.END
+            logger.error(f"Error generating combinations: {e}")
+            # Fallback to simple styling
+            all_combinations = [input_text]
+            for char in input_text.lower():
+                if char in STYLISH_CHARS and len(STYLISH_CHARS[char]) > 0:
+                    # Add a few simple styled versions
+                    for i in range(min(5, len(STYLISH_CHARS[char]))):
+                        styled = input_text.replace(char, STYLISH_CHARS[char][i])
+                        all_combinations.append(styled)
+        
+        # Calculate pagination
+        combos_per_page = 10  # 10 combinations per page (2 rows of 5)
+        total_pages = (len(all_combinations) + combos_per_page - 1) // combos_per_page
+        
+        # Get current page of combinations
+        start_idx = page * combos_per_page
+        end_idx = min(start_idx + combos_per_page, len(all_combinations))
+        current_page_combos = all_combinations[start_idx:end_idx]
+        
+        # Add title
+        keyboard.append([
+            InlineKeyboardButton(f"🎲 Style Combinations (Page {page+1}/{total_pages}) 🎲", callback_data="do_nothing")
+        ])
+        
+        # Add style combinations (current page)
+        for i in range(0, len(current_page_combos), 5):  # Five combinations per row (5x5 grid)
+            row = []
+            for j in range(5):
+                if i + j < len(current_page_combos):
+                    styled_text = current_page_combos[i + j]
+                    # Truncate if too long
+                    styled_preview = (styled_text[:9] + "...") if len(styled_text) > 12 else styled_text
+                    
+                    # Use the styled text directly in the callback data, but limit its length
+                    safe_text = styled_text[:50] if len(styled_text) > 50 else styled_text
+                    callback_data = f"copy_text_{safe_text}"
+                    
+                    row.append(InlineKeyboardButton(f"{styled_preview}", callback_data=callback_data))
+            if row:
+                keyboard.append(row)
+        
+        # Add pagination navigation
+        nav_row = []
+        if page > 0:
+            nav_row.append(InlineKeyboardButton("⬅️ Prev Combos", callback_data=f"combo_page_{page-1}_{input_text[:15]}"))
+        if page < total_pages - 1:
+            nav_row.append(InlineKeyboardButton("Next Combos ➡️", callback_data=f"combo_page_{page+1}_{input_text[:15]}"))
+        
+        if nav_row:
+            keyboard.append(nav_row)
+        
+        # Add regenerate option
+        keyboard.append([
+            InlineKeyboardButton("🔄 Generate New Combinations", callback_data=f"regenerate_combos_{input_text[:15]}")
+        ])
+        
+        # Add navigation buttons
+        keyboard.append([
+            InlineKeyboardButton("🔄 Try New Text", callback_data="generate_combos"),
+            InlineKeyboardButton("🔙 Main Menu", callback_data="back_to_start")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message_text = f"✨ Tap any combination to copy - '{input_text}' (browse with next/prev):"
+        
+        # Use the helper function for sending/editing messages with retry logic
+        await retry_telegram_api_call(
+            send_or_edit_message,
+            message, 
+            message_text, 
+            reply_markup, 
+            query
+        )
+        
+        return ConversationHandler.END
+    except Exception as e:
+        logger.error(f"Error in show_style_combinations: {e}")
+        # Fallback to a simple message
+        simple_keyboard = [[InlineKeyboardButton("🔄 Try Again", callback_data="generate_combos")]]
+        simple_markup = InlineKeyboardMarkup(simple_keyboard)
+        
+        try:
+            if query:
+                await query.message.reply_text("⚠️ Sorry, I couldn't generate style combinations. Please try again.", reply_markup=simple_markup)
+            else:
+                await message.reply_text("⚠️ Sorry, I couldn't generate style combinations. Please try again.", reply_markup=simple_markup)
+        except Exception as msg_error:
+            logger.error(f"Failed to send error message: {msg_error}")
+        
+        return ConversationHandler.END
 
 async def show_all_character_styles(update, context):
     """Show all character styles in a grid format."""

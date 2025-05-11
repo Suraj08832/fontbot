@@ -4,8 +4,9 @@ A feature-rich Telegram bot that lets users generate stylish text with various f
 
 ## Features
 
-- ✨ Generate stylish names with different font styles
-- 🎲 Create random style combinations 
+- ✨ Instant styling - just type any name or text and get stylish versions automatically
+- 🔤 Works with any input text, including names in any language
+- 🎨 Multiple stylish designs for each input
 - 📋 Easy copy functionality for sharing styled text
 - 📱 User-friendly interface with pagination
 
@@ -32,16 +33,19 @@ A feature-rich Telegram bot that lets users generate stylish text with various f
 ## Configuration
 
 The bot uses the following files:
-- `bot.py`: Main bot functionality
-- `config.py`: Configuration settings
+- `bot.py`: Main bot functionality and error handling
+- `handlers.py`: Message handlers
+- `callbacks.py`: Callback handlers for interactive buttons
+- `ui_components.py`: UI generation components
+- `utils.py`: Styling utility functions
 - `styles.py`: Font style definitions
-- `utils.py`: Utility functions
+- `config.py`: Configuration settings
 
 ## How to Use
 
 1. Start the bot with `/start`
-2. Choose "Generate Stylish Name" or "Generate Style Combinations"
-3. Enter your text
+2. Simply type any name or text directly in the chat
+3. The bot will instantly create multiple stylish versions
 4. Browse through the available styles
 5. Tap any style to get copyable text
 

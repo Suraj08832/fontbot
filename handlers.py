@@ -1,10 +1,12 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, ConversationHandler
+import time
 
 from config import WELCOME_MESSAGE, HELP_MESSAGE, CHOOSING_STYLE, CUSTOMIZING_STYLE, SELECTING_CHAR
 from utils import transform_text, get_all_styles, get_stylish_char_by_index
 from ui_components import show_all_styled_names, show_style_combinations, show_name_styles_grid, show_char_grid
+from telegram.error import TimedOut, NetworkError
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -19,10 +21,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Create a simpler menu with generate options
         keyboard = [
             [
-                InlineKeyboardButton("✨ Generate Stylish Name ✨", callback_data="generate_name")
+                InlineKeyboardButton("🔥 Just type any name to style it! 🔥", callback_data="info_auto_style")
             ],
             [
-                InlineKeyboardButton("🎲 Generate Style Combinations", callback_data="generate_combos")
+                InlineKeyboardButton("✨ Example Styles Gallery ✨", callback_data="generate_name")
             ],
             [
                 InlineKeyboardButton("👤 Our Channel", url="https://t.me/chamber_of_heart1")
@@ -30,12 +32,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
+        welcome_text = f"{WELCOME_MESSAGE}\n\n✅ Simply type any name or text and I'll instantly style it for you!"
+        
         try:
             logger.debug("Attempting to send photo message")
             # Send image
             await update.message.reply_photo(
                 photo=WELCOME_IMAGE_URL,
-                caption=f"{WELCOME_MESSAGE}",
+                caption=welcome_text,
                 reply_markup=reply_markup
             )
             logger.debug("Photo message sent successfully")
@@ -44,7 +48,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Fallback to text-only message
             logger.debug("Attempting to send text-only message")
             await update.message.reply_text(
-                f"{WELCOME_MESSAGE}",
+                welcome_text,
                 reply_markup=reply_markup
             )
             logger.debug("Text-only message sent successfully")
@@ -52,7 +56,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error in start command: {e}")
         # Fallback to simple text message if everything else fails
         await update.message.reply_text(
-            "Welcome to Stylish Text Bot! Tap Generate Stylish Name to get started."
+            "Welcome to Stylish Text Bot! Just type any name and I'll style it for you instantly."
         )
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -94,15 +98,35 @@ async def char_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle text input from users."""
-    text = update.message.text
-    context.user_data['input_text'] = text
-    
-    if context.user_data.get('mode') == 'generate_name':
+    try:
+        text = update.message.text
+        context.user_data['input_text'] = text
+        
+        # Always process input as a name to style regardless of mode
+        logger.debug(f"Processing text for styling: {text[:10]}...")
+        
         # Show a comprehensive grid with both name styles and character styles
-        return await show_all_styled_names(update.message, text)
-    elif context.user_data.get('mode') == 'generate_combos':
-        # Show combinations of character styles
-        return await show_style_combinations(update.message, text)
-    else:
-        # Fallback to standard name styling
-        return await show_name_styles_grid(update.message, text) 
+        try:
+            return await show_all_styled_names(update.message, text)
+        except (TimedOut, NetworkError) as e:
+            logger.error(f"Network error when generating styled names: {e}")
+            # Retry after a short delay
+            await update.message.reply_text("⚠️ Network issue detected. Retrying...")
+            time.sleep(2)
+            try:
+                return await show_all_styled_names(update.message, text)
+            except Exception as retry_e:
+                logger.error(f"Failed to generate styled names after retry: {retry_e}")
+                await update.message.reply_text("⚠️ Sorry, I couldn't process your request. Please try again later.")
+                return
+        except Exception as e:
+            logger.error(f"Error generating styled names: {e}")
+            await update.message.reply_text("⚠️ Sorry, I couldn't generate styled names. Please try again with different text.")
+            return
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_text: {e}")
+        try:
+            await update.message.reply_text("⚠️ Something went wrong. Please try again.")
+        except:
+            pass
+        return 

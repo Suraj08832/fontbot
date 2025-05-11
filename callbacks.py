@@ -5,7 +5,7 @@ from telegram.ext import ContextTypes, ConversationHandler
 from telegram.error import BadRequest, TimedOut, NetworkError, TelegramError
 
 from config import WELCOME_MESSAGE, CHOOSING_STYLE, CUSTOMIZING_STYLE
-from utils import transform_text, get_all_styles
+from utils import transform_text, get_all_styles, format_styled_name
 from ui_components import show_all_styled_names, show_style_combinations, show_char_styles
 
 # Set up logging
@@ -28,13 +28,59 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Prompt user to enter a name to style
             context.user_data['mode'] = 'generate_name'
             try:
-                await query.edit_message_text("✏️ Enter your name or text to style it:")
-                return CUSTOMIZING_STYLE
-            except BadRequest as e:
-                logger.error(f"Failed to edit message: {e}")
-                # If edit fails, send a new message
+                # Use retry pattern for UI operations
+                retry_count = 0
+                max_retries = 3
+                while retry_count < max_retries:
+                    try:
+                        await query.edit_message_text("✏️ Enter your name or text to style it:")
+                        logger.debug("Successfully prompted user for name input")
+                        return CUSTOMIZING_STYLE
+                    except (TimedOut, NetworkError) as e:
+                        retry_count += 1
+                        wait_time = 2 ** retry_count  # Exponential backoff
+                        logger.warning(f"Network error when prompting for name (attempt {retry_count}): {e}. Waiting {wait_time}s before retry.")
+                        time.sleep(wait_time)
+                    except BadRequest as e:
+                        logger.error(f"Failed to edit message: {e}")
+                        # If edit fails, send a new message
+                        await query.message.reply_text("✏️ Enter your name or text to style it:")
+                        return CUSTOMIZING_STYLE
+                
+                # If we get here, we've exhausted retries
+                logger.error("Failed to prompt for name after multiple retries")
+                await query.message.reply_text("⚠️ Network issues detected. Please try again by clicking 'Generate Stylish Name' again.")
+                return
+            except Exception as e:
+                logger.error(f"Unexpected error in generate_name handler: {e}")
                 await query.message.reply_text("✏️ Enter your name or text to style it:")
                 return CUSTOMIZING_STYLE
+        
+        elif query.data == "info_auto_style":
+            # Show information about the auto-styling feature
+            try:
+                info_text = (
+                    "✨ <b>Automatic Styling Feature</b> ✨\n\n"
+                    "Just type any name or text directly in the chat, and I'll instantly create multiple stylish versions for you!\n\n"
+                    "✅ Works with any name or text\n"
+                    "✅ Creates beautiful designs with special characters\n"
+                    "✅ No commands needed - just type and send!\n\n"
+                    "Try it now - send me any name!"
+                )
+                
+                keyboard = [[InlineKeyboardButton("🔙 Back to Menu", callback_data="back_to_start")]]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await query.edit_message_text(
+                    info_text,
+                    parse_mode='HTML',
+                    reply_markup=reply_markup
+                )
+            except Exception as e:
+                logger.error(f"Error showing auto-style info: {e}")
+                # Fallback to a new message if edit fails
+                await query.message.reply_text("Just type any name or text to see it styled instantly!")
+            return
         
         elif query.data == "generate_combos":
             # Prompt user to enter a name for combination styling
@@ -125,7 +171,9 @@ async def handle_copy_text(query, context):
         # Try to get the original text if available
         original_text = context.user_data.get('input_text', None)
         if original_text:
-            copy_keyboard = [[InlineKeyboardButton("🔙 Back to Combinations", callback_data=f"regenerate_combos_{original_text}")]]
+            # Limit original text length to avoid Button_data_invalid error
+            truncated_text = original_text[:15] if len(original_text) > 15 else original_text
+            copy_keyboard = [[InlineKeyboardButton("🔙 Back to Combinations", callback_data=f"regenerate_combos_{truncated_text}")]]
         
         reply_markup = InlineKeyboardMarkup(copy_keyboard)
         
@@ -142,12 +190,48 @@ async def handle_copy_text(query, context):
 async def handle_combo_page(query, context):
     """Handle pagination for combinations"""
     try:
-        parts = query.data.split("_")
-        page = int(parts[2])
-        input_text = parts[3]
+        parts = query.data.split("_", 3)  # Split into at most 4 parts
+        if len(parts) < 3:
+            logger.error(f"Invalid combo_page data: {query.data}")
+            await query.message.reply_text("Invalid pagination request. Please try again.")
+            return
+            
+        try:
+            page = int(parts[2])
+        except ValueError:
+            logger.error(f"Invalid page number in combo_page: {parts[2]}")
+            page = 0
+            
+        # Get the input text, joining all remaining parts if there were splits in the text
+        if len(parts) > 3:
+            input_text = parts[3]
+        else:
+            # Fallback to stored text
+            input_text = context.user_data.get('input_text', 'Sample')
+        
         # Store the input text in context
         context.user_data['input_text'] = input_text
-        return await show_style_combinations(query.message, input_text, page=page, query=query)
+        
+        logger.debug(f"Navigating to combinations page {page} for text: {input_text[:10]}...")
+        
+        # Use retry logic for API calls
+        retry_count = 0
+        max_retries = 3
+        last_error = None
+        
+        while retry_count < max_retries:
+            try:
+                return await show_style_combinations(query.message, input_text, page=page, query=query)
+            except (TimedOut, NetworkError) as e:
+                retry_count += 1
+                wait_time = 2 ** retry_count  # Exponential backoff
+                last_error = e
+                logger.warning(f"Network error in handle_combo_page (attempt {retry_count}): {e}. Waiting {wait_time}s.")
+                time.sleep(wait_time)
+        
+        # If we get here, all retries failed
+        logger.error(f"Failed to handle combo page after {max_retries} retries: {last_error}")
+        await query.message.reply_text("Could not load combinations due to network issues. Please try again.")
     except Exception as e:
         logger.error(f"Error in handle_combo_page: {e}")
         await query.message.reply_text("Could not load combinations. Please try again.")
@@ -156,11 +240,39 @@ async def handle_combo_page(query, context):
 async def handle_regenerate_combos(query, context):
     """Handle regenerating combinations"""
     try:
-        input_text = query.data.replace("regenerate_combos_", "", 1)
+        # Get input text, handling potential underscore in the text
+        input_parts = query.data.split("_", 2)  # Split at most twice
+        if len(input_parts) < 3:
+            logger.error(f"Invalid regenerate_combos data: {query.data}")
+            await query.message.reply_text("Invalid regeneration request. Please try again.")
+            return
+            
+        input_text = input_parts[2]
+        
         # Store the input text in context
         context.user_data['input_text'] = input_text
-        # Show new combinations starting at page 0
-        return await show_style_combinations(query.message, input_text, page=0, query=query)
+        
+        logger.debug(f"Regenerating combinations for text: {input_text[:10]}...")
+        
+        # Use retry logic for API calls
+        retry_count = 0
+        max_retries = 3
+        last_error = None
+        
+        while retry_count < max_retries:
+            try:
+                # Show new combinations starting at page 0
+                return await show_style_combinations(query.message, input_text, page=0, query=query)
+            except (TimedOut, NetworkError) as e:
+                retry_count += 1
+                wait_time = 2 ** retry_count  # Exponential backoff
+                last_error = e
+                logger.warning(f"Network error in handle_regenerate_combos (attempt {retry_count}): {e}. Waiting {wait_time}s.")
+                time.sleep(wait_time)
+        
+        # If we get here, all retries failed
+        logger.error(f"Failed to regenerate combos after {max_retries} retries: {last_error}")
+        await query.message.reply_text("Could not regenerate combinations due to network issues. Please try again.")
     except Exception as e:
         logger.error(f"Error in handle_regenerate_combos: {e}")
         await query.message.reply_text("Could not regenerate combinations. Please try again.")
@@ -201,7 +313,10 @@ async def handle_copy_style(query, context):
         if len(parts) > 3:
             style_index = int(parts[2])
             text = parts[3]
-            styled_text = transform_text(text, get_all_styles()[style_index])
+            styles = get_all_styles()
+            
+            # Use the format_styled_name function for template styling
+            styled_text = format_styled_name(text, styles[style_index])
             
             # Send the styled text as a separate message for easy copying
             copy_keyboard = [[InlineKeyboardButton("🔙 Back to Styles", callback_data=f"back_to_styles_{text}")]]
