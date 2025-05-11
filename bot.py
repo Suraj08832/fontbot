@@ -7,7 +7,7 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMe
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, ConversationHandler, filters
 from config import BOT_TOKEN, WELCOME_MESSAGE, HELP_MESSAGE, CHOOSING_STYLE, CUSTOMIZING_STYLE
 from utils import transform_text, create_custom_style, get_all_styles, get_stylish_char_by_index
-from styles import STYLISH_CHARS, NAME_STYLES, name_styles, character_styles
+from styles import STYLISH_CHARS, NAME_STYLES
 
 # Enable logging
 logging.basicConfig(
