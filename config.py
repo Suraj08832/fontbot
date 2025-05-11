@@ -4,9 +4,8 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Bot token - First try to get from environment, then from .env file
-# For Replit, add BOT_TOKEN to the Secrets tab
-BOT_TOKEN = os.environ.get("BOT_TOKEN") or os.getenv("BOT_TOKEN", "YOUR_BOT_TOKEN")
+# Bot token - Using the provided token directly
+BOT_TOKEN = os.environ.get("BOT_TOKEN") or os.getenv("BOT_TOKEN", "7877213016:AAGt4O2V1NLaeaK5r1VVPSdMomywo-KCt-4")
 
 # Conversation states
 CHOOSING_STYLE, CUSTOMIZING_STYLE = range(2)
