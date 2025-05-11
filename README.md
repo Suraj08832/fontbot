@@ -51,5 +51,5 @@ The bot uses the following files:
 
 ## Credits
 
-Created by [Your Name]
-Contact: [@your_telegram_username] 
+Created by [suraj]
+Contact: [@crush_hu_tera] 
