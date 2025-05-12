@@ -6,7 +6,7 @@ import threading
 import datetime
 import os
 import atexit
-from telegram import Update, types
+from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters
 from telegram.error import TimedOut, NetworkError, TelegramError, Conflict
 
