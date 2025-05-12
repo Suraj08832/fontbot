@@ -121,6 +121,17 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         elif query.data == "back_to_start":
             return await handle_back_to_start(query)
         
+        elif query.data == "how_to_use":
+            how_to_use_text = (
+                "📝 *How to Use This Bot:*\n\n"
+                "1️⃣ Simply type any name or text in the chat\n"
+                "2️⃣ The bot will automatically generate 25 stylish variations\n"
+                "3️⃣ Tap on any style you like to copy it\n\n"
+                "That's it! No commands needed - just type and get beautiful font styles!"
+            )
+            await query.message.reply_text(how_to_use_text, parse_mode="Markdown")
+            return
+        
         else:
             # Unknown callback data
             logger.warning(f"Unknown callback data: {query.data}")

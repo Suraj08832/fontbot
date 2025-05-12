@@ -18,7 +18,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
     keyboard = [
         [
-            InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot"),
+            InlineKeyboardButton("🎨 Designer Bot", url="https://t.me/Fonts_designer_bot"),
+        ],
+        [
+            InlineKeyboardButton("📢 Our Channel", url="https://t.me/chamber_of_heart1"),
+        ],
+        [
+            InlineKeyboardButton("❓ How to Use", callback_data="how_to_use"),
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
