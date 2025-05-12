@@ -16,17 +16,18 @@ WELCOME_IMAGE_URL = "https://telegra.ph/httpsyoutubeZrpEIw8IWwksiQlfLq0IxVxjEYpQ
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send a message when the command /start is issued."""
-    markup = types.InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        types.InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot"),
-        types.InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot")
-    )
+    keyboard = [
+        [
+            InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot"),
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     welcome_text = (
         "👋 Welcome to the Font Styling Bot!\n\n"
         "If you want to convert your normal name to a stylish font, use this bot.\n"
         "After that, send me your stylish name, and I will generate it into a fancy name."
     )
-    await update.message.reply_text(welcome_text, reply_markup=markup)
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send help message when the command /help is issued."""
