@@ -15,49 +15,18 @@ logger = logging.getLogger(__name__)
 WELCOME_IMAGE_URL = "https://telegra.ph/httpsyoutubeZrpEIw8IWwksiQlfLq0IxVxjEYpQq-05-11"
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Send welcome message with image and buttons when the command /start is issued."""
-    try:
-        logger.debug("Start command received")
-        # Create a simpler menu with generate options
-        keyboard = [
-            [
-                InlineKeyboardButton("🔥 Just type any name to style it! 🔥", callback_data="info_auto_style")
-            ],
-            [
-                InlineKeyboardButton("✨ Example Styles Gallery ✨", callback_data="generate_name")
-            ],
-            [
-                InlineKeyboardButton("👤 Our Channel", url="https://t.me/chamber_of_heart1")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        welcome_text = f"{WELCOME_MESSAGE}\n\n✅ Simply type any name or text and I'll instantly style it for you!"
-        
-        try:
-            logger.debug("Attempting to send photo message")
-            # Send image
-            await update.message.reply_photo(
-                photo=WELCOME_IMAGE_URL,
-                caption=welcome_text,
-                reply_markup=reply_markup
-            )
-            logger.debug("Photo message sent successfully")
-        except Exception as e:
-            logger.error(f"Failed to send photo: {e}")
-            # Fallback to text-only message
-            logger.debug("Attempting to send text-only message")
-            await update.message.reply_text(
-                welcome_text,
-                reply_markup=reply_markup
-            )
-            logger.debug("Text-only message sent successfully")
-    except Exception as e:
-        logger.error(f"Error in start command: {e}")
-        # Fallback to simple text message if everything else fails
-        await update.message.reply_text(
-            "Welcome to Stylish Text Bot! Just type any name and I'll style it for you instantly."
-        )
+    """Send a message when the command /start is issued."""
+    markup = types.InlineKeyboardMarkup(row_width=2)
+    markup.add(
+        types.InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot"),
+        types.InlineKeyboardButton("🎨 Font Bot", url="https://t.me/Fonts_designer_bot")
+    )
+    welcome_text = (
+        "👋 Welcome to the Font Styling Bot!\n\n"
+        "If you want to convert your normal name to a stylish font, use this bot.\n"
+        "After that, send me your stylish name, and I will generate it into a fancy name."
+    )
+    await update.message.reply_text(welcome_text, reply_markup=markup)
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Send help message when the command /help is issued."""
